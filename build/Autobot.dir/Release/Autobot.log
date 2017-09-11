@@ -1,3 +1,0 @@
-﻿  _main.cpp
-C:\Users\Kimmintra\Desktop\robotic\AutoBotProject\Autobot\include\KinectConnector.h(159): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-  Autobot.vcxproj -> C:\Users\Kimmintra\Desktop\robotic\AutoBotProject\Autobot\build\Release\Autobot.exe
