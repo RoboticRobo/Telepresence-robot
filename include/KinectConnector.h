@@ -140,43 +140,43 @@ public :
 			isGrabData = true;
 		}
 
-		////////////// match //////////////////////////
-		sensor->NuiImageGetColorPixelCoordinateFrameFromDepthPixelFrameAtResolution(
-			NUI_IMAGE_RESOLUTION_1280x960, NUI_IMAGE_RESOLUTION_640x480, 
-			640*480, depthD16, 640*480*2, colorCoordinates);
+		//////////////// match //////////////////////////
+		//sensor->NuiImageGetColorPixelCoordinateFrameFromDepthPixelFrameAtResolution(
+		//	NUI_IMAGE_RESOLUTION_1280x960, NUI_IMAGE_RESOLUTION_640x480, 
+		//	640*480, depthD16, 640*480*2, colorCoordinates);
 
-		indexImg.setTo(-1);
-		// loop over each row and column of the color
-		for(int i = 0; i < 960; i++)
-		{
-			for(int j = 0; j < 1280; j++)
-			{
-				// calculate index into depth array
-				int depthIndex = j/2 + (i/2 * 640);
-				int depth = depthImg.at<USHORT>(depthIndex);
+		//indexImg.setTo(-1);
+		//// loop over each row and column of the color
+		//for(int i = 0; i < 960; i++)
+		//{
+		//	for(int j = 0; j < 1280; j++)
+		//	{
+		//		// calculate index into depth array
+		//		int depthIndex = j/2 + (i/2 * 640);
+		//		int depth = depthImg.at<USHORT>(depthIndex);
 
-				// retrieve the depth to color mapping for the current depth pixel
-				int colorInDepthX = colorCoordinates[depthIndex * 2] + 0.028*depth - 15;
-				int colorInDepthY = colorCoordinates[depthIndex * 2 + 1];
+		//		// retrieve the depth to color mapping for the current depth pixel
+		//		int colorInDepthX = colorCoordinates[depthIndex * 2] + 0.028*depth - 15;
+		//		int colorInDepthY = colorCoordinates[depthIndex * 2 + 1];
 
-				// make sure the depth pixel maps to a valid point in color space
-				if ( colorInDepthX >= 0 && colorInDepthX < 1280 && colorInDepthY >= 0 && colorInDepthY < 960 &&	0 < depth )
-				{
-					int colorIndex = colorInDepthX + colorInDepthY * 1280;
-					indexImg.at<int>(colorIndex) = depthIndex;
-				}
-			}
-		}
+		//		// make sure the depth pixel maps to a valid point in color space
+		//		if ( colorInDepthX >= 0 && colorInDepthX < 1280 && colorInDepthY >= 0 && colorInDepthY < 960 &&	0 < depth )
+		//		{
+		//			int colorIndex = colorInDepthX + colorInDepthY * 1280;
+		//			indexImg.at<int>(colorIndex) = depthIndex;
+		//		}
+		//	}
+		//}
 
-		////////////// point //////////////////////////
-		for(int i = 0; i < 480; i++)
-		{
-			for(int j = 0; j < 640; j++)
-			{
-				Vector4 vec = NuiTransformDepthImageToSkeleton(j, i, depthImg.at<USHORT>(i, j), NUI_IMAGE_RESOLUTION_640x480);
-				pointImg.at<cv::Vec3f>(i, j) = cv::Vec3f(-8000*vec.x, 8000*vec.y, 8000*vec.z);
-			}
-		}
+		//////////////// point //////////////////////////
+		//for(int i = 0; i < 480; i++)
+		//{
+		//	for(int j = 0; j < 640; j++)
+		//	{
+		//		Vector4 vec = NuiTransformDepthImageToSkeleton(j, i, depthImg.at<USHORT>(i, j), NUI_IMAGE_RESOLUTION_640x480);
+		//		pointImg.at<cv::Vec3f>(i, j) = cv::Vec3f(-8000*vec.x, 8000*vec.y, 8000*vec.z);
+		//	}
+		//}
 
 		return isGrabData;
 	}

@@ -31,6 +31,7 @@ int main()
 	CreateData	robotData;
 	RobotConnector	robot;
 
+
 	Mat depthImg;
 	Mat colorImg;
 	Mat indexImg;
@@ -66,8 +67,6 @@ int main()
 		imshow("depthImg", depthImg);
 		imshow("colorImg", colorImg);
 
-		depthImg.at<uchar>(, );
-
 		char c = cvWaitKey(30);
 		if (c == 27) break;
 
@@ -100,6 +99,10 @@ int main()
 
 		robot.LEDs(velL > 0, velR > 0, color, inten);
 
+		
+		
+		
+
 		if (!robot.DriveDirect(velL, velR))
 			cout << "SetControl Fail" << endl;
 
@@ -111,6 +114,34 @@ int main()
 
 		cout << "Robot " << robotData.infrared << endl;
 
+		kin.GrabData(depthImg, colorImg, indexImg, pointImg);
+		int x_wall = 10;
+		int y_wall = 10;
+		bool wall = false;
+		int min_depth = 9999;
+		for (int i = 320 - x_wall / 2; i < 320 + x_wall / 2; i++) {
+			for (int j = 240 - y_wall / 2; j < 240 + y_wall / 2; j++) {
+				int depth = depthImg.at<USHORT>(i, j);
+				if (depth > min_depth && depth!=0) {
+					min_depth = depth;
+				}
+				
+				if (depth < 700 && depth != 0) {
+					vx = vz = 0;
+					robot.LEDs(1, 1, 1, 1);
+					wall = true;
+					cout << "wall" << endl;
+
+				}
+			}
+
+		}
+		
+		cout << min_depth << endl;
+		
+		if (wall) {
+			break;
+		}
 
 	}
 
