@@ -156,14 +156,15 @@ int main()
 		{
 
 			if (mode == 's' || mode == 'c') {
+				DWORD myThreadID;
+				HANDLE myHandle = CreateThread(0, 0, streamVideo, &server , 0, &myThreadID);
+
 				strcpy(buffer, "=> Server connected...\n");
 				send(server, buffer, bufsize, 0);
 			}
 
 
 			if (mode == 'c') {
-				DWORD myThreadID;
-				HANDLE myHandle = CreateThread(0, 0, streamVideo, &server , 0, &myThreadID);
 
 				while (true) {
 					cout << "Client: ";
