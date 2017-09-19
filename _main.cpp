@@ -26,6 +26,29 @@ using namespace cv;
 
 bool isRecord = false;
 
+
+bool check_wall(Mat depthImg) {
+	int x_wall = 10;
+	int y_wall = 10;
+	//int min_depth = 9999;
+	for (int i = 320 - x_wall / 2; i < 320 + x_wall / 2; i++) {
+		for (int j = 240 - y_wall / 2; j < 240 + y_wall / 2; j++) {
+			int depth = depthImg.at<USHORT>(i, j);
+			/*if (depth > min_depth && depth != 0) {
+				min_depth = depth;
+			}*/
+			if (depth < 700 && depth != 0) {
+				
+				cout << "wall" << endl;
+				return true;
+			
+
+			}
+		}
+
+	}
+	return false;
+}
 int main()
 {
 	CreateData	robotData;
@@ -83,8 +106,14 @@ int main()
 		case 'c': robot.Connect(Create_Comport); break;
 		}
 
+		if (check_wall(depthImg)) {
+			vx = 0;
+			vz = -1;
+		}
+
 		double vl = vx - vz;
 		double vr = vx + vz;
+
 
 		int velL = (int)(vl*Create_MaxVel);
 		int velR = (int)(vr*Create_MaxVel);
@@ -114,34 +143,12 @@ int main()
 
 		cout << "Robot " << robotData.infrared << endl;
 
-		kin.GrabData(depthImg, colorImg, indexImg, pointImg);
-		int x_wall = 10;
-		int y_wall = 10;
-		bool wall = false;
-		int min_depth = 9999;
-		for (int i = 320 - x_wall / 2; i < 320 + x_wall / 2; i++) {
-			for (int j = 240 - y_wall / 2; j < 240 + y_wall / 2; j++) {
-				int depth = depthImg.at<USHORT>(i, j);
-				if (depth > min_depth && depth!=0) {
-					min_depth = depth;
-				}
-				
-				if (depth < 700 && depth != 0) {
-					vx = vz = 0;
-					robot.LEDs(1, 1, 1, 1);
-					wall = true;
-					cout << "wall" << endl;
-
-				}
-			}
-
-		}
 		
-		cout << min_depth << endl;
 		
-		if (wall) {
-			break;
-		}
+		
+		//cout << min_depth << endl;
+		
+		
 
 	}
 
@@ -149,3 +156,5 @@ int main()
 
 	return 0;
 }
+
+
