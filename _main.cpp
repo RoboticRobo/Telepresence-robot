@@ -102,8 +102,9 @@ int main()
 		case 's': vx = -1; break;
 		case 'a': vz = +1; break;
 		case 'd': vz = -1; break;
-		case ' ': vx = vz = 0; break;
+		//case ' ': vx = vz = 0; break;
 		case 'c': robot.Connect(Create_Comport); break;
+		default: vx = 1; break;
 		}
 
 		if (check_wall(depthImg)) {
