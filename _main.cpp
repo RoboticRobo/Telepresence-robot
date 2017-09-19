@@ -27,27 +27,29 @@ using namespace cv;
 bool isRecord = false;
 
 
-bool check_wall(Mat depthImg) {
-	int x_wall = 10;
-	int y_wall = 10;
+int check_wall(Mat depthImg) {
+	int x_wall = 50;
+	int y_wall = 50;
 	//int min_depth = 9999;
 	for (int i = 320 - x_wall / 2; i < 320 + x_wall / 2; i++) {
-		for (int j = 240 - y_wall / 2; j < 240 + y_wall / 2; j++) {
+		for (int j = 100 - y_wall / 2; j < 100 + y_wall / 2; j++) {
 			int depth = depthImg.at<USHORT>(i, j);
 			/*if (depth > min_depth && depth != 0) {
 				min_depth = depth;
 			}*/
-			if (depth < 700 && depth != 0) {
+			if (depth < 800 && depth > 600 && depth != 0) {
 				
 				cout << "wall" << endl;
-				return true;
+				return 1;
 			
-
+			}
+			else if(depth <=600 && depth!=0) {
+				return 2;
 			}
 		}
 
 	}
-	return false;
+	return 0;
 }
 int main()
 {
@@ -100,16 +102,19 @@ int main()
 		{
 		case 'w': vx = +1; break;
 		case 's': vx = -1; break;
-		case 'a': vz = +1; break;
-		case 'd': vz = -1; break;
-		//case ' ': vx = vz = 0; break;
+		case 'a': vz = +1;  break;
+		case 'd': vz = -1;  break;
+		case ' ': vx = vz = 0; break;
 		case 'c': robot.Connect(Create_Comport); break;
-		default: vx = 1; break;
+		//default: vx = 1; break;
 		}
 
-		if (check_wall(depthImg)) {
-			vx = 0;
-			vz = -1;
+		if (check_wall(depthImg)==1) {
+			vx *= 0.5;
+			vz *= 0.5;
+		}else if (check_wall(depthImg) == 2) {
+			if (vx > 0)vx = 0;
+			
 		}
 
 		double vl = vx - vz;
