@@ -35,15 +35,15 @@ int check_wall(Mat depthImg) {
 		for (int j = 100 - y_wall / 2; j < 100 + y_wall / 2; j++) {
 			int depth = depthImg.at<USHORT>(i, j);
 			/*if (depth > min_depth && depth != 0) {
-			min_depth = depth;
+				min_depth = depth;
 			}*/
 			if (depth < 800 && depth > 600 && depth != 0) {
-
+				
 				cout << "wall" << endl;
 				return 1;
-
+			
 			}
-			else if (depth <= 600 && depth != 0) {
+			else if(depth <=600 && depth!=0) {
 				return 2;
 			}
 		}
@@ -106,16 +106,15 @@ int main()
 		case 'd': vz = -1;  break;
 		case ' ': vx = vz = 0; break;
 		case 'c': robot.Connect(Create_Comport); break;
-			//default: vx = 1; break;
+		//default: vx = 1; break;
 		}
 
-		if (check_wall(depthImg) == 1) {
+		if (check_wall(depthImg)==1) {
 			vx *= 0.5;
 			vz *= 0.5;
-		}
-		else if (check_wall(depthImg) == 2) {
+		}else if (check_wall(depthImg) == 2) {
 			if (vx > 0)vx = 0;
-
+			
 		}
 
 		double vl = vx - vz;
@@ -135,9 +134,9 @@ int main()
 
 		robot.LEDs(velL > 0, velR > 0, color, inten);
 
-
-
-
+		
+		
+		
 
 		if (!robot.DriveDirect(velL, velR))
 			cout << "SetControl Fail" << endl;
@@ -150,12 +149,12 @@ int main()
 
 		cout << "Robot " << robotData.infrared << endl;
 
-
-
-
+		
+		
+		
 		//cout << min_depth << endl;
-
-
+		
+		
 
 	}
 

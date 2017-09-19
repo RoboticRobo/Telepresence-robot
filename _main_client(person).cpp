@@ -32,18 +32,45 @@ using namespace cv;
 #define Create_Comport "COM3"
 
 bool isRecord = false;
-int drag = 0 , select_flag = 0;
+int drag = 0, select_flag = 0;
 
 boolean inCircle(int x, int y, int r) {
 	return (x*x) + (y*y) <= (r*r);
 }
 
+
+DWORD WINAPI streamVideo(LPVOID lpParameter)
+{
+	int& client = *((int*)lpParameter);
+
+	Mat img;
+	img = Mat::zeros(480, 640, CV_8UC3);
+	int imgSize = img.total() * img.elemSize();
+	uchar *iptr = img.data;
+	int bytes = 0;
+	int key;
+
+	std::cout << "Image Size:" << imgSize << std::endl;
+
+	while (true) {
+
+		if ((bytes = recv(client, (char *)iptr, imgSize, MSG_WAITALL)) == -1) {
+			std::cerr << "recv failed, received bytes = " << bytes << std::endl;
+		}
+
+		cv::imshow("CV Video Client", img);
+		cvWaitKey(100);
+	}
+
+	return 0;
+}
+
 void CallBackFunc(int event, int x, int y, int flags, void* userdata)
-{	
+{
 	select_flag = 0;
 	if (event == EVENT_LBUTTONDOWN && !drag && !select_flag)
 	{
-		if (inCircle(x-320, y-240, 240)) {
+		if (inCircle(x - 320, y - 240, 240)) {
 			cout << (x - 320) << " " << (-1)*(y - 240) << endl;
 			drag = 1;
 		}
@@ -63,8 +90,8 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 
 int main()
 {
-	Mat mat(480, 640, CV_8UC3, cv::Scalar(0, 0, 0) );
-	circle(mat, Point(320, 240), 240, cv::Scalar(255, 255, 255	), -1);
+	Mat mat(480, 640, CV_8UC3, cv::Scalar(0, 0, 0));
+	circle(mat, Point(320, 240), 240, cv::Scalar(255, 255, 255), -1);
 	int client;
 	int portNum = 1500; // NOTE that the port number is same for both client and server
 	bool isExit = false;
@@ -115,9 +142,14 @@ int main()
 	cout << "\n\n=> Enter # to end the connection\n" << endl;
 
 	cout << "Client: ";
+
+	DWORD myThreadID;
+	HANDLE myHandle = CreateThread(0, 0, streamVideo, &client, 0, &myThreadID);
+
+
 	while (true) {
 		setMouseCallback("Mat", CallBackFunc, NULL);
-		imshow("Mat",mat);
+		imshow("Mat", mat);
 		waitKey(20);
 
 		if (kbhit() != 0) {
