@@ -7,15 +7,13 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <io.h>
+#include <Windows.h>
 
 #include "RobotConnector.h"
 
 #include "cv.h"
 #include "highgui.h"
 
-#include <Windows.h>
-#include <iostream>
-#include <stdio.h>
 #include <NuiApi.h>
 #include <NuiImageCamera.h>
 #include <NuiSensor.h>
@@ -30,9 +28,14 @@ using namespace std;
 using namespace cv;
 
 #define Create_Comport "COM3"
+#define PORT_NUM 1500
+#define IP_SERVER "127.0.0.1"
+#define RADIUS 150
 
 bool isRecord = false;
 int drag = 0, select_flag = 0;
+int mouseX, mouseZ;
+bool mouseClick = 0;
 
 boolean inCircle(int x, int y, int r) {
 	return (x*x) + (y*y) <= (r*r);
@@ -43,129 +46,123 @@ DWORD WINAPI streamVideo(LPVOID lpParameter)
 {
 	int& client = *((int*)lpParameter);
 
-	Mat img;
-	img = Mat::zeros(480, 640, CV_8UC3);
+	Mat img = Mat::zeros(120, 160, CV_8UC3);
 	int imgSize = img.total() * img.elemSize();
 	uchar *iptr = img.data;
-	int bytes = 0;
-	int key;
-
-	std::cout << "Image Size:" << imgSize << std::endl;
 
 	while (true) {
 
-		if ((bytes = recv(client, (char *)iptr, imgSize, MSG_WAITALL)) == -1) {
-			std::cerr << "recv failed, received bytes = " << bytes << std::endl;
+		if (recv(client, (char *)iptr, imgSize, MSG_WAITALL) != SOCKET_ERROR) {
+			Mat dst;
+			Size size(640, 480);
+			resize(img, dst, size);
+
+			imshow("CV Video Client", dst);
 		}
 
-		cv::imshow("CV Video Client", img);
-		cvWaitKey(100);
+		cvWaitKey(40);
 	}
 
 	return 0;
 }
 
-void CallBackFunc(int event, int x, int y, int flags, void* userdata)
+void mouseCallBack(int event, int x, int y, int flags, void* userdata)
 {
-	select_flag = 0;
-	if (event == EVENT_LBUTTONDOWN && !drag && !select_flag)
-	{
-		if (inCircle(x - 320, y - 240, 240)) {
-			cout << (x - 320) << " " << (-1)*(y - 240) << endl;
-			drag = 1;
-		}
-	}
+	x -= RADIUS;
+	y -= RADIUS;
 
-	if (event == EVENT_MOUSEMOVE && drag && !select_flag) {
-		if (inCircle(x - 320, y - 240, 240)) {
-			cout << (x - 320) << " " << (-1)*(y - 240) << endl;
+	if (event == EVENT_LBUTTONDOWN || (event == EVENT_MOUSEMOVE && mouseClick))
+	{
+		if (inCircle(x, y, RADIUS)) {
+			mouseClick = 1;
+			mouseZ = (-1)*(x);
+			mouseX = (-1)*(y);
 		}
 	}
-	if (event == CV_EVENT_LBUTTONUP && drag && !select_flag)
-	{
-		drag = 0;
-		select_flag = 1;
-	}
+	else if (event == CV_EVENT_LBUTTONUP)
+		mouseClick = 0;
 }
 
 int main()
 {
-	Mat mat(480, 640, CV_8UC3, cv::Scalar(0, 0, 0));
-	circle(mat, Point(320, 240), 240, cv::Scalar(255, 255, 255), -1);
+	//////////////////////////////////////////////
+	// socket
+	//////////////////////////////////////////////
 	int client;
-	int portNum = 1500; // NOTE that the port number is same for both client and server
-	bool isExit = false;
 	const int bufsize = 1024;
 	char buffer[bufsize];
-	char* ip = "127.0.0.1";
+	char* ip = IP_SERVER;
 
 	struct sockaddr_in server_addr;
-
 
 	WSADATA wsaData;
 
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) == SOCKET_ERROR) {
-		cout << "Error initialising WSA.\n" << endl;
+		cout << "\nError initialising WSA. Error code: " << WSAGetLastError() << endl;
 		return -1;
 	}
 
 
-	client = socket(AF_INET, SOCK_STREAM, 0);
-
-	// DWORD timeout = 1 * 1000;
-	// setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, (const char*)&timeout, sizeof(timeout));
-
-
-	if (client < 0)
-	{
-		cout << "\nError establishing socket..." << endl;
-		exit(1);
+	if ((client = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR) {
+		cout << "\nError establishing socket.. Error code: " << WSAGetLastError() << endl;
+		return -1;
 	}
 
 	cout << "\n=> Socket client has been created..." << endl;
 
 	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(portNum);
+	server_addr.sin_port = htons(PORT_NUM);
 	inet_pton(AF_INET, ip, &server_addr.sin_addr);
 
-	if (connect(client, (struct sockaddr *)&server_addr, sizeof(server_addr)) == 0)
-		cout << "=> Connection to the server " << inet_ntoa(server_addr.sin_addr) << " with port number: " << portNum << endl;
-	else {
-		cout << WSAGetLastError();
-		return 0;
+	if (connect(client, (struct sockaddr *)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
+		cout << "\n Socket has been established. Error code: " << WSAGetLastError() << endl;
+		return -1;
 	}
 
-	cout << "=> Awaiting confirmation from the server..." << endl; //line 40
+	cout << "=> Connection to the server " << inet_ntoa(server_addr.sin_addr) << " with port number: " << PORT_NUM << endl;
+
+	cout << "=> Awaiting confirmation from the server..." << endl;
 	recv(client, buffer, bufsize, 0);
-	cout << "=> Connection confirmed, you are good to go...";
-
-	cout << "\n\n=> Enter # to end the connection\n" << endl;
-
-	cout << "Client: ";
+	cout << "=> Connection confirmed, you are good to go..." << endl;
 
 	DWORD myThreadID;
 	HANDLE myHandle = CreateThread(0, 0, streamVideo, &client, 0, &myThreadID);
 
 
-	while (true) {
-		setMouseCallback("Mat", CallBackFunc, NULL);
-		imshow("Mat", mat);
-		waitKey(20);
+	//////////////////////////////////////////////
+	// control
+	//////////////////////////////////////////////
+	Mat mat(RADIUS * 2, RADIUS * 2, CV_8UC3, Scalar(0, 0, 0));
+	circle(mat, Point(RADIUS, RADIUS), RADIUS, Scalar(255, 255, 255), -1);
+	imshow("Control", mat);
+	setMouseCallback("Control", mouseCallBack, NULL);
 
-		if (kbhit() != 0) {
-			buffer[0] = getch();
-			buffer[1] = 0;
-			cout << buffer[0];
-			send(client, buffer, bufsize, 0);
-			cout << endl;
-			cout << "Client: ";
+	while (true) {
+		Mat matClick = mat.clone();
+
+		if (mouseClick) {
+			circle(matClick, Point(-1 * mouseZ + RADIUS, -1 * mouseX + RADIUS), 40, Scalar(0, 0, 0), -1);
+
+			int vx = (int)(mouseX * 10.0 / (RADIUS + 1));
+			int vz = (int)(mouseZ * 10.0 / (RADIUS + 1));
+			int sum = (vx + vz) > 10 ? (vx + vz) : 10;
+			vx = (int)(vx * 10.0 / sum);
+			vz = (int)(vz * 10.0 / sum);
+			string str_send = "";
+			str_send += vx >= 0 ? "+" : "-";
+			str_send += to_string(abs(vx));
+			str_send += "|";
+			str_send += vz >= 0 ? "+" : "-";
+			str_send += to_string(abs(vz));
+			str_send += '\0';
+
+			cout << "send: " << str_send << endl;
+			send(client, str_send.c_str(), str_send.size(), 0);
 		}
+
+		imshow("Control", matClick);
+		cvWaitKey(100);
 	}
 
-
-
-	cout << "\n=> Connection terminated.\nGoodbye...\n";
-
-	close(client);
 	return 0;
 }

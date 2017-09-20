@@ -1,14 +1,19 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <iostream>
+#include <conio.h>
+#include <sys/types.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <io.h>
+#include <Windows.h>
 
 #include "RobotConnector.h"
 
 #include "cv.h"
 #include "highgui.h"
 
-#include <Windows.h>
-#include <iostream>
-#include <stdio.h>
 #include <NuiApi.h>
 #include <NuiImageCamera.h>
 #include <NuiSensor.h>
@@ -23,145 +28,141 @@ using namespace std;
 using namespace cv;
 
 #define Create_Comport "COM3"
+#define PORT_NUM 1500
+#define IP_SERVER "127.0.0.1"
+#define RADIUS 150
 
 bool isRecord = false;
+int drag = 0, select_flag = 0;
+int mouseX, mouseZ;
+bool mouseClick = 0;
+
+boolean inCircle(int x, int y, int r) {
+	return (x*x) + (y*y) <= (r*r);
+}
 
 
-int check_wall(Mat depthImg) {
-	int x_wall = 50;
-	int y_wall = 50;
-	//int min_depth = 9999;
-	for (int i = 320 - x_wall / 2; i < 320 + x_wall / 2; i++) {
-		for (int j = 100 - y_wall / 2; j < 100 + y_wall / 2; j++) {
-			int depth = depthImg.at<USHORT>(i, j);
-			/*if (depth > min_depth && depth != 0) {
-			min_depth = depth;
-			}*/
-			if (depth < 800 && depth > 600 && depth != 0) {
+DWORD WINAPI streamVideo(LPVOID lpParameter)
+{
+	int& client = *((int*)lpParameter);
 
-				cout << "wall" << endl;
-				return 1;
+	Mat img = Mat::zeros(120, 160, CV_8UC3);
+	int imgSize = img.total() * img.elemSize();
+	uchar *iptr = img.data;
 
-			}
-			else if (depth <= 600 && depth != 0) {
-				return 2;
-			}
+	while (true) {
+
+		if (recv(client, (char *)iptr, imgSize, MSG_WAITALL) != SOCKET_ERROR) {
+			Mat dst;
+			Size size(640, 480);
+			resize(img, dst, size);
+
+			imshow("CV Video Client", dst);
 		}
 
+		cvWaitKey(40);
 	}
+
 	return 0;
 }
+
+void mouseCallBack(int event, int x, int y, int flags, void* userdata)
+{
+	x -= RADIUS;
+	y -= RADIUS;
+
+	if (event == EVENT_LBUTTONDOWN || (event == EVENT_MOUSEMOVE && mouseClick))
+	{
+		if (inCircle(x, y, RADIUS)) {
+			mouseClick = 1;
+			mouseZ = (-1)*(x);
+			mouseX = (-1)*(y);
+		}
+	}
+	else if (event == CV_EVENT_LBUTTONUP)
+		mouseClick = 0;
+}
+
 int main()
 {
-	CreateData	robotData;
-	RobotConnector	robot;
+	//////////////////////////////////////////////
+	// socket
+	//////////////////////////////////////////////
+	int client;
+	const int bufsize = 1024;
+	char buffer[bufsize];
+	char* ip = IP_SERVER;
 
+	struct sockaddr_in server_addr;
 
-	Mat depthImg;
-	Mat colorImg;
-	Mat indexImg;
-	Mat pointImg;
+	WSADATA wsaData;
 
-	ofstream	record;
-	record.open("../data/robot.txt");
-
-	if (!robot.Connect(Create_Comport))
-	{
-		cout << "Error : Can't connect to robot @" << Create_Comport << endl;
-		int a;
-		cin >> a;
+	if (WSAStartup(MAKEWORD(2, 2), &wsaData) == SOCKET_ERROR) {
+		cout << "\nError initialising WSA. Error code: " << WSAGetLastError() << endl;
 		return -1;
 	}
 
-	KinectConnector kin = KinectConnector();
-	if (!kin.Connect()) {
-		int a;
-		cin >> a;
 
-		return 1;
+	if ((client = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR) {
+		cout << "\nError establishing socket.. Error code: " << WSAGetLastError() << endl;
+		return -1;
 	}
 
-	robot.DriveDirect(0, 0);
-	cvNamedWindow("Robot");
+	cout << "\n=> Socket client has been created..." << endl;
 
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_port = htons(PORT_NUM);
+	inet_pton(AF_INET, ip, &server_addr.sin_addr);
 
-	while (true)
-	{
-
-		kin.GrabData(depthImg, colorImg, indexImg, pointImg);
-		imshow("depthImg", depthImg);
-		imshow("colorImg", colorImg);
-
-		char c = cvWaitKey(30);
-		if (c == 27) break;
-
-		double vx, vz;
-		vx = vz = 0.0;
-
-		switch (c)
-		{
-		case 'w': vx = +1; break;
-		case 's': vx = -1; break;
-		case 'a': vz = +1;  break;
-		case 'd': vz = -1;  break;
-		case ' ': vx = vz = 0; break;
-		case 'c': robot.Connect(Create_Comport); break;
-			//default: vx = 1; break;
-		}
-
-		if (check_wall(depthImg) == 1) {
-			vx *= 0.5;
-			vz *= 0.5;
-		}
-		else if (check_wall(depthImg) == 2) {
-			if (vx > 0)vx = 0;
-
-		}
-
-		double vl = vx - vz;
-		double vr = vx + vz;
-
-
-		int velL = (int)(vl*Create_MaxVel);
-		int velR = (int)(vr*Create_MaxVel);
-
-		int color = (abs(velL) + abs(velR)) / 4;
-		color = (color < 0) ? 0 : (color > 255) ? 255 : color;
-
-		int inten = (robotData.cliffSignal[1] + robotData.cliffSignal[2]) / 8 - 63;
-		inten = (inten < 0) ? 0 : (inten > 255) ? 255 : inten;
-
-		//cout << color << " " << inten << " " << robotData.cliffSignal[1] << " " << robotData.cliffSignal[2] << endl;
-
-		robot.LEDs(velL > 0, velR > 0, color, inten);
-
-
-
-
-
-		if (!robot.DriveDirect(velL, velR))
-			cout << "SetControl Fail" << endl;
-
-		if (!robot.ReadData(robotData))
-			cout << "ReadData Fail" << endl;
-
-		if (isRecord)
-			record << robotData.cliffSignal[0] << "\t" << robotData.cliffSignal[1] << "\t" << robotData.cliffSignal[2] << "\t" << robotData.cliffSignal[3] << endl;
-
-		cout << "Robot " << robotData.infrared << endl;
-
-
-
-
-		//cout << min_depth << endl;
-
-
-
+	if (connect(client, (struct sockaddr *)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
+		cout << "\n Socket has been established. Error code: " << WSAGetLastError() << endl;
+		return -1;
 	}
 
-	robot.Disconnect();
+	cout << "=> Connection to the server " << inet_ntoa(server_addr.sin_addr) << " with port number: " << PORT_NUM << endl;
+
+	cout << "=> Awaiting confirmation from the server..." << endl;
+	recv(client, buffer, bufsize, 0);
+	cout << "=> Connection confirmed, you are good to go..." << endl;
+
+	DWORD myThreadID;
+	HANDLE myHandle = CreateThread(0, 0, streamVideo, &client, 0, &myThreadID);
+
+
+	//////////////////////////////////////////////
+	// control
+	//////////////////////////////////////////////
+	Mat mat(RADIUS * 2, RADIUS * 2, CV_8UC3, Scalar(0, 0, 0));
+	circle(mat, Point(RADIUS, RADIUS), RADIUS, Scalar(255, 255, 255), -1);
+	imshow("Control", mat);
+	setMouseCallback("Control", mouseCallBack, NULL);
+
+	while (true) {
+		Mat matClick = mat.clone();
+
+		if (mouseClick) {
+			circle(matClick, Point(-1 * mouseZ + RADIUS, -1 * mouseX + RADIUS), 40, Scalar(0, 0, 0), -1);
+
+			int vx = (int)(mouseX * 10.0 / (RADIUS + 1));
+			int vz = (int)(mouseZ * 10.0 / (RADIUS + 1));
+			int sum = (vx + vz) > 10 ? (vx + vz) : 10;
+			vx = (int)(vx * 10.0 / sum);
+			vz = (int)(vz * 10.0 / sum);
+			string str_send = "";
+			str_send += vx >= 0 ? "+" : "-";
+			str_send += to_string(abs(vx));
+			str_send += "|";
+			str_send += vz >= 0 ? "+" : "-";
+			str_send += to_string(abs(vz));
+			str_send += '\0';
+
+			cout << "send: " << str_send << endl;
+			send(client, str_send.c_str(), str_send.size(), 0);
+		}
+
+		imshow("Control", matClick);
+		cvWaitKey(100);
+	}
 
 	return 0;
 }
-
-
