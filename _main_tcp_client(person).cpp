@@ -29,7 +29,7 @@ using namespace cv;
 
 #define Create_Comport "COM3"
 #define PORT_NUM 1500
-#define IP_SERVER "192.168.43.85"
+#define IP_SERVER "192.168.43.131"
 #define RADIUS 150
 
 bool isRecord = false;
@@ -46,21 +46,20 @@ DWORD WINAPI streamVideo(LPVOID lpParameter)
 {
 	int& client = *((int*)lpParameter);
 
-	Mat img = Mat::zeros(120, 160, CV_8UC3);
+	Mat img = Mat::zeros(96, 128, CV_8UC3);
 	int imgSize = img.total() * img.elemSize();
 	uchar *iptr = img.data;
 
 	while (true) {
-
+		cout << "p";
 		if (recv(client, (char *)iptr, imgSize, MSG_WAITALL) != SOCKET_ERROR) {
-			Mat dst;
-			Size size(640, 480);
+			cout << "AAAAA";
+			Mat dst; Size size(640, 480);
 			resize(img, dst, size);
 
 			imshow("CV Video Client", dst);
+			cvWaitKey(10);
 		}
-
-		cvWaitKey(40);
 	}
 
 	return 0;
@@ -124,6 +123,11 @@ int main()
 	cout << "=> Awaiting confirmation from the server..." << endl;
 	recv(client, buffer, bufsize, 0);
 	cout << "=> Connection confirmed, you are good to go..." << endl;
+
+
+	//DWORD timeout = 30;
+	//setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
+
 
 	DWORD myThreadID;
 	HANDLE myHandle = CreateThread(0, 0, streamVideo, &client, 0, &myThreadID);

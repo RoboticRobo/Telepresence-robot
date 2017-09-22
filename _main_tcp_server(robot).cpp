@@ -33,32 +33,40 @@ Mat depthImg;
 Mat colorImg;
 Mat indexImg;
 Mat pointImg;
-
+Mat temp;
+int grab = 0;
 DWORD WINAPI streamVideo(LPVOID lpParameter)
 {
 	int& server = *((int*)lpParameter);
 
-	//VideoCapture cap(1);
+			//VideoCapture cap(1);
+			//cap >> colorImg;
 
+	cvNamedWindow("streamvideo");
+
+	
 	while (true) {
-		Mat src;
-		Mat dst;
-		Size size(160, 120);
 
-		//cap >> src;
-		//resize(src, dst, size);
+		if (grab == 0) {
+			Mat src;
+			Mat dst;
+			Size size(128, 96);
 
-		resize(colorImg, dst, size);
+			resize(colorImg, dst, size);
 
-		int dstSize = dst.total() * dst.elemSize();
+			int dstSize = dst.total() * dst.elemSize();
 
-		unsigned char * p = dst.data;
-		const char * c = (const char *)p;
+			unsigned char * p = dst.data;
+			const char * c = (const char *)p;
 
-		if (send(server, c, dstSize, 0) == SOCKET_ERROR)
-			break;
+			cout << "send" << endl;
+			if (send(server, c, dstSize, 0) == SOCKET_ERROR)
+				break;
 
-		cvWaitKey(40);
+
+			cvWaitKey(50);
+		}
+
 	}
 
 	return 0;
@@ -84,6 +92,7 @@ int check_wall(Mat depthImg) {
 	return 3;
 	return 0;
 	*/
+
 	int countleft = 0;
 	int typeleft = 0;
 	int xleft = 0;
@@ -134,6 +143,7 @@ int check_wall(Mat depthImg) {
 			}
 		}
 	}
+
 
 	if (typeleft == 1 || typeleft == 2) {
 		if (xleft >= -20)
@@ -218,9 +228,10 @@ int main()
 				continue;
 			}
 
-			DWORD timeout = 100;
+			DWORD timeout = 50;
 			setsockopt(server, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
 
+			cout << "start" << endl;
 		}
 
 		//////////////////////////////////////////////
@@ -239,10 +250,14 @@ int main()
 		if (mode == 'c') {
 
 			while (true) {
-				if ((nReadBytes = recv(server, buffer, bufsize, 0)) == SOCKET_ERROR)
-					break;
 
+				if ((nReadBytes = recv(server, buffer, bufsize, 0)) == SOCKET_ERROR)
+					if (WSAGetLastError() != WSAETIMEDOUT)
+						break;
+
+				cvWaitKey(30);
 			}
+
 			if (nReadBytes == SOCKET_ERROR) {
 				closesocket(server);
 				closesocket(client);
@@ -255,7 +270,6 @@ int main()
 			RobotConnector	robot;
 			KinectConnector kin = KinectConnector();
 
-
 			if (!robot.Connect(Create_Comport) || !kin.Connect()) {
 				cout << "Error : Can't connect to robot or kinect" << endl;
 
@@ -265,30 +279,31 @@ int main()
 				}
 				continue;
 			}
-
 			kin.GrabData(depthImg, colorImg, indexImg, pointImg);
 
-			if (mode == 's' || mode == 'c') {
+			if (mode == 's') {
 				DWORD myThreadID;
 				HANDLE myHandle = CreateThread(0, 0, streamVideo, &server, 0, &myThreadID);
 			}
 
+
 			robot.DriveDirect(0, 0);
 			cvNamedWindow("Robot");
-			
+
 			int counter = 0;
+			grab = 0;
 			while (true)
 			{
 
 				double vx, vz;
-				if(counter == 0 )
+				if (counter == 0)
 					vx = vz = 0.0;
 
 				if (mode == 's') {
 					if ((nReadBytes = recv(server, buffer, bufsize, 0)) == SOCKET_ERROR) {
 						if (WSAGetLastError() != WSAETIMEDOUT)
 							break;
-						else if(counter > 0)
+						else if (counter > 0)
 							counter--;
 					}
 					else {
@@ -307,18 +322,20 @@ int main()
 					char c = 0;
 					c = cvWaitKey(30);
 					switch (c) {
-						case 'w': vx = +1; break;
-						case 's': vx = -1; break;
-						case 'a': vz = +1; break;
-						case 'd': vz = -1; break;
-						default: vx = 0; break;
+					case 'w': vx = +1; break;
+					case 's': vx = -1; break;
+					case 'a': vz = +1; break;
+					case 'd': vz = -1; break;
+					default: vx = 0; break;
 					}
 				}
 
+				grab = 1;
 				kin.GrabData(depthImg, colorImg, indexImg, pointImg);
+				grab = 0;
 
 				if (mode != 's' && mode != 'c')
-					imshow("colorImg", colorImg);
+					imshow("stream", colorImg);
 
 				int status_wall = check_wall(depthImg);
 
@@ -338,7 +355,8 @@ int main()
 
 				robot.DriveDirect(velL, velR);
 
-				cvWaitKey(40);
+				if (mode == 's')
+					cvWaitKey(30);
 			}
 
 			if (mode == 's' || mode == 'c') {
@@ -349,7 +367,6 @@ int main()
 			robot.Disconnect();
 		}
 	}
-
 
 	return 0;
 }
