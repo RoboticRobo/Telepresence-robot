@@ -1,0 +1,16 @@
+ - _main_detect_near_object.cpp
+	+ ใช้สำหรับค่า depth ที่ได้จาก kinect ในแต่ละ pixel
+	+ depth = 0 แสดงสีแดง
+	+ depth < 600 แสดงสีน้ำเงิน
+	+ depth < 800 แสดงสีเขียว
+ - _main_tcp_server(robot).cpp
+	+ รันบนหุ่นยนต์
+	+ เลือกได้ 2 mode หลัก
+		- mode ควบคุมผ่านคีย์บอร์ดบนหุ่นยนต์ (ใช้ teamviewer)
+		- mode ควบคุมผ่าน socket (ไม่ใช้ teamviewer)
+ - _main_tcp_client(person).cpp (ใช้กรณ๊ที่รัน server ใน mode socket เท่านั้น
+	+ รันบนเครื่องที่ต้องการจะควบคุมผ่าน socket 
+	+ ควบคุมผ่านแผง dpad
+
+* ต้อง set ip และ port ของ server บนไฟล์ _main_tcp_client(person) ก่อน
+* ต้องเปิด server ก่อน client 
