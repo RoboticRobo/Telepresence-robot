@@ -29,7 +29,7 @@ using namespace cv;
 
 #define Create_Comport "COM3"
 #define PORT_NUM 1500
-#define IP_SERVER "127.0.0.1"
+#define IP_SERVER "192.168.43.85"
 #define RADIUS 150
 
 bool isRecord = false;
@@ -143,20 +143,24 @@ int main()
 		if (mouseClick) {
 			circle(matClick, Point(-1 * mouseZ + RADIUS, -1 * mouseX + RADIUS), 40, Scalar(0, 0, 0), -1);
 
-			int vx = (int)(mouseX * 10.0 / (RADIUS + 1));
-			int vz = (int)(mouseZ * 10.0 / (RADIUS + 1));
-			int sum = (vx + vz) > 10 ? (vx + vz) : 10;
-			vx = (int)(vx * 10.0 / sum);
-			vz = (int)(vz * 10.0 / sum);
+			double tempx = (1.0 * mouseX / (RADIUS + 1));
+			double tempz = (1.0 * mouseZ / (RADIUS + 1));
+			double length = sqrt(tempx*tempx + tempz*tempz);
+
+			int vx = (int)(tempx * 10.0 * length);
+			int vz = (int)(tempz * 10.0 * length);
+
 			string str_send = "";
 			str_send += vx >= 0 ? "+" : "-";
 			str_send += to_string(abs(vx));
 			str_send += "|";
+			if (vx < 0)
+				vz *= -1;
 			str_send += vz >= 0 ? "+" : "-";
 			str_send += to_string(abs(vz));
 			str_send += '\0';
 
-			cout << "send: " << str_send << endl;
+			//			cout << "send: " << str_send << "=> mean: " << vx - vz << "|" << vx + vz << endl;
 			send(client, str_send.c_str(), str_send.size(), 0);
 		}
 

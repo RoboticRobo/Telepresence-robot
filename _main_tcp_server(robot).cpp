@@ -38,15 +38,17 @@ DWORD WINAPI streamVideo(LPVOID lpParameter)
 {
 	int& server = *((int*)lpParameter);
 
-	VideoCapture cap(1);
+	//VideoCapture cap(1);
 
 	while (true) {
 		Mat src;
 		Mat dst;
 		Size size(160, 120);
 
-		cap >> src;
-		resize(src, dst, size);
+		//cap >> src;
+		//resize(src, dst, size);
+
+		resize(colorImg, dst, size);
 
 		int dstSize = dst.total() * dst.elemSize();
 
@@ -63,24 +65,93 @@ DWORD WINAPI streamVideo(LPVOID lpParameter)
 }
 
 int check_wall(Mat depthImg) {
-	int x_wall = 200;
+	/*int x_wall = 250;
 	int y_wall = 2;
 	int count = 0;
 	for (int i = 320 - x_wall / 2; i < 320 + x_wall / 2; i++) {
-		for (int j = 300 - y_wall / 2; j < 300 + y_wall / 2; j++) {
-			int depth = depthImg.at<USHORT>(j, i);
+	for (int j = 240 - y_wall / 2; j < 240 + y_wall / 2; j++) {
+	int depth = depthImg.at<USHORT>(j, i);
 
-			if (depth == 0)
-				count++;
-			else if (depth < 800 && depth > 600)
-				return 1;
-			else if (depth <= 600)
-				return 2;
+	if (depth == 0)
+	count++;
+	else if (depth < 800 && depth > 600)
+	return 1;
+	else if (depth <= 600)
+	return 2;
+	}
+	}
+	if (count >= 170)
+	return 3;
+	return 0;
+	*/
+	int countleft = 0;
+	int typeleft = 0;
+	int xleft = 0;
+	int flagleft = 0;
+	for (int i = 0; i < 320; i++) {
+		int depth = depthImg.at<USHORT>(240, i);
+
+		int x = (int)(depth * (i - 320) / 5240);
+		if (depth == 0)
+			countleft++;
+		else if (depth < 800 && depth > 600) {
+			typeleft = 1;
+			xleft = x;
+		}
+		else if (depth <= 600) {
+			typeleft = 2;
+			xleft = x;
+		}
+		else {
+			if (x >= -20) {
+				flagleft = 1;
+			}
 		}
 	}
-	if (count == 400)
-		return 3;
+
+
+	int countright = 0;
+	int typeright = 0;
+	int xright = 0;
+	int flagright = 0;
+	for (int i = 639; i >= 320; i--) {
+		int depth = depthImg.at<USHORT>(240, i);
+
+		int x = (int)(depth * (i - 320) / 5240);
+		if (depth == 0)
+			countright++;
+		else if (depth < 800 && depth > 600) {
+			typeright = 1;
+			xright = x;
+		}
+		else if (depth <= 600) {
+			typeright = 2;
+			xright = x;
+		}
+		else {
+			if (x <= 20) {
+				flagright = 1;
+			}
+		}
+	}
+
+	if (typeleft == 1 || typeleft == 2) {
+		if (xleft >= -20)
+			return typeleft;
+	}
+
+	else if (typeright == 1 || typeright == 2) {
+		if (xright <= 20)
+			return typeright;
+	}
+	else if (flagleft == 1 && flagright == 1)
+		return 0;
+	else {
+		if (countleft > 250 || countright > 250)
+			return 2;
+	}
 	return 0;
+
 }
 
 int main()
@@ -146,6 +217,10 @@ int main()
 				cout << "=> Error on accepting..." << endl;
 				continue;
 			}
+
+			DWORD timeout = 100;
+			setsockopt(server, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
+
 		}
 
 		//////////////////////////////////////////////
@@ -153,9 +228,6 @@ int main()
 		//////////////////////////////////////////////
 
 		if (mode == 's' || mode == 'c') {
-			DWORD myThreadID;
-			HANDLE myHandle = CreateThread(0, 0, streamVideo, &server, 0, &myThreadID);
-
 			strcpy(buffer, "=> Server connected...\n");
 			send(server, buffer, bufsize, 0);
 		}
@@ -167,11 +239,9 @@ int main()
 		if (mode == 'c') {
 
 			while (true) {
-				cout << "receive: ";
 				if ((nReadBytes = recv(server, buffer, bufsize, 0)) == SOCKET_ERROR)
 					break;
 
-				cout << buffer << endl;
 			}
 			if (nReadBytes == SOCKET_ERROR) {
 				closesocket(server);
@@ -185,6 +255,7 @@ int main()
 			RobotConnector	robot;
 			KinectConnector kin = KinectConnector();
 
+
 			if (!robot.Connect(Create_Comport) || !kin.Connect()) {
 				cout << "Error : Can't connect to robot or kinect" << endl;
 
@@ -195,39 +266,52 @@ int main()
 				continue;
 			}
 
+			kin.GrabData(depthImg, colorImg, indexImg, pointImg);
+
+			if (mode == 's' || mode == 'c') {
+				DWORD myThreadID;
+				HANDLE myHandle = CreateThread(0, 0, streamVideo, &server, 0, &myThreadID);
+			}
+
 			robot.DriveDirect(0, 0);
 			cvNamedWindow("Robot");
-
+			
+			int counter = 0;
 			while (true)
 			{
 
 				double vx, vz;
-				vx = vz = 0.0;
+				if(counter == 0 )
+					vx = vz = 0.0;
 
 				if (mode == 's') {
-					cout << "receive: ";
-					if ((nReadBytes = recv(server, buffer, bufsize, 0)) == SOCKET_ERROR)
-						break;
+					if ((nReadBytes = recv(server, buffer, bufsize, 0)) == SOCKET_ERROR) {
+						if (WSAGetLastError() != WSAETIMEDOUT)
+							break;
+						else if(counter > 0)
+							counter--;
+					}
+					else {
+						counter = 3;
 
-					vx = ((buffer[1] - '0')) / 10.0;
-					if (buffer[0] == '-')
-						vx *= -1;
+						vx = ((buffer[1] - '0')) / 10.0;
+						if (buffer[0] == '-')
+							vx *= -1;
 
-					vz = ((buffer[4] - '0')) / 10.0;
-					if (buffer[3] == '-')
-						vz *= -1;
-
-					cout << "vx = " << vx << ", vz = " << vz << endl;
+						vz = ((buffer[4] - '0')) / 10.0;
+						if (buffer[3] == '-')
+							vz *= -1;
+					}
 				}
 				else {
 					char c = 0;
 					c = cvWaitKey(30);
 					switch (c) {
-					case 'w': vx = +1; break;
-					case 's': vx = -1; break;
-					case 'a': vz = +1; break;
-					case 'd': vz = -1; break;
-					default: vx = 0; break;
+						case 'w': vx = +1; break;
+						case 's': vx = -1; break;
+						case 'a': vz = +1; break;
+						case 'd': vz = -1; break;
+						default: vx = 0; break;
 					}
 				}
 
@@ -253,6 +337,8 @@ int main()
 				int velR = (int)(vr*Create_MaxVel);
 
 				robot.DriveDirect(velL, velR);
+
+				cvWaitKey(40);
 			}
 
 			if (mode == 's' || mode == 'c') {
